@@ -21,16 +21,15 @@ async function getPairCreatedEvents(): Promise<any[]> {
 
     // Process the events
     const formattedEvents = events.slice(0, 10).map((event) => {
-        event
+        console.log(event)
             return {
+                txHash: event.transactionHash,
                 //@ts-ignore
                 token0: event.args[0],
                 //@ts-ignore
                 token1: event.args[1],
                 //@ts-ignore
-                pair: event.args[2],
-                //@ts-ignore
-                // allPairsLength: event.args[3]
+                pair: event.args[2]
             };
         });
 
