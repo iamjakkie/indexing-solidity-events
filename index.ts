@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { PairCreatedEvent } from './models';
 import readJsonFile from './utils/readJsonFile';
+import appendJsonFile from './utils/appendJsonFile';
 dotenv.config();
 
 if (!fs.existsSync('out')) fs.mkdirSync('out');
@@ -13,7 +14,9 @@ const factoryAddress = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f';
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
-async function getPairCreatedEvents(): Promise<any[]> {
+
+
+async function getPairCreatedEvents() {
     // Connect to Ethereum node provider using JsonRpcProvider
     const provider = new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
 
@@ -23,11 +26,15 @@ async function getPairCreatedEvents(): Promise<any[]> {
 
     // Fetch the PairCreated events via a new filter object that represents that event
     const filter = factoryContract.filters.PairCreated();
-    const events = await factoryContract.queryFilter(filter, 17900000, 17901000);
-
-    // Process the events (slicing to limit to the first 10 for this example)
-    const formattedEvents = events.slice(0, 10).map((event) => {
-        console.log(event)
+    const startingBlock = 10000835;
+    // const endingBlock = 18037988;
+    const endingBlock = 10000835 + 20000;
+    let currentBlock = startingBlock;
+    while (currentBlock < endingBlock) {
+        // if currentBlock > endingBlock replace
+        let events = await factoryContract.queryFilter(filter, currentBlock, currentBlock + 10000);
+        let eventsToSave = events.map((event) => {
+            // save instead of push
             return {
                 txHash: event.transactionHash,
                 //@ts-ignore
@@ -39,7 +46,26 @@ async function getPairCreatedEvents(): Promise<any[]> {
             };
         });
 
-    return formattedEvents;
+        // Append to file
+
+        const fileName = "out/LP_" + currentBlock + "_" + (currentBlock+10000) + ".json";
+        saveJsonFile(eventsToSave, fileName);
+        currentBlock += 10000;
+    }
+    // const events = await factoryContract.queryFilter(filter, 10000835, 18037988); //until 01.09.2023
+
+    // Process the events (slicing to limit to the first 10 for this example)
+    // const formattedEvents = events.slice(0, 10).map((event) => {
+    //         return {
+    //             txHash: event.transactionHash,
+    //             //@ts-ignore
+    //             token0: event.args[0],
+    //             //@ts-ignore
+    //             token1: event.args[1],
+    //             //@ts-ignore
+    //             pair: event.args[2]
+    //         };
+    //     });
 }
 
 
@@ -58,12 +84,13 @@ async function getTokenMetadata(tokenAddress: string): Promise<any> {
     // Fetch the PairCreated events via a new filter object that represents that event
     const name = await tokenContract.name();
     const symbol = await tokenContract.symbol();
+    const totalSupply = await tokenContract.totalSupply();
 
-    return { name, symbol };
+    return { name, symbol, totalSupply };
 }
 
 // TODO: Add a function to fetch the token diluted market cap + circulating supply market cap from etherscan
-
+// OR get price from oracle
 async function getTokenMarketCap(tokenAddress: string): Promise<any> {
     
 }
@@ -126,7 +153,7 @@ async function getTokenPrice(tokenAddress: string): Promise<any> {
 
 async function savePairCreatedEvents() {
   try {
-      const pairCreatedEvents = await getPairCreatedEvents();
+      const pairCreatedEvents = await getPairCreatedEvents(); // inefficient, should dump every batch immidiately
       saveJsonFile(pairCreatedEvents, 'out/results.json');
 
       // Display the results to the stdout:
@@ -164,10 +191,14 @@ async function processPairCreatedEvents() {
     saveJsonFile(tokenMetadata, 'out/tokenMetadata.json');
 }
 
+// savePairCreatedEvents();
 
-processPairCreatedEvents();
+getPairCreatedEvents();
 
 
-"0x330c5eCc0a4fa773cfcBBcd1928869D6B1781318":["Miladys","밀라디스",null]
+// processPairCreatedEvents();
+
+
+// "0x330c5eCc0a4fa773cfcBBcd1928869D6B1781318":["Miladys","밀라디스",null]
 
 // {"txHash":"0xb7554c4e5e03bfa7045829316d29b92f01ca3205de5f96cbe90dc9cba33970cf","token0":"0x330c5eCc0a4fa773cfcBBcd1928869D6B1781318","token1":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2","pair":"0x79b0180F1014Fd0eb6EC0a13599a7CDBB658EaE3"},
