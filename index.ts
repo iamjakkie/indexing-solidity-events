@@ -144,7 +144,23 @@ async function getTokenMarketCap(tokenAddress: string): Promise<any> {
 //     });
   
 
-async function getTokenPrice(tokenAddress: string): Promise<any> {
+async function getTokenPrice(pairAddress: string): Promise<any> {
+    const provider = new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
+
+    const pairAbi = ['function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external returns (uint amount0In, uint amount1In)'];
+    const pairContract = new ethers.Contract(pairAddress, pairAbi, provider);
+    
+    const filter = pairContract.filters.swap();
+    const startingBlock = 10000835;
+    const endingBlock = 10000835 + 20000;
+    let currentBlock = startingBlock;
+    while (currentBlock < endingBlock) {
+
+        const events = await pairContract.queryFilter(filter, currentBlock, currentBlock + 10000);
+        events.map((event) => {
+            console.log(event);
+        });
+    }
 
 }
 
@@ -193,7 +209,8 @@ async function processPairCreatedEvents() {
 
 // savePairCreatedEvents();
 
-getPairCreatedEvents();
+// getPairCreatedEvents();
+
 
 
 // processPairCreatedEvents();
