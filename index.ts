@@ -27,31 +27,35 @@ async function getPairCreatedEvents() {
     // Fetch the PairCreated events via a new filter object that represents that event
     const filter = factoryContract.filters.PairCreated();
     const startingBlock = 10000835;
-    // const endingBlock = 18037988;
-    const endingBlock = 10000835 + 20000;
+    const endingBlock = 18037988;
+    // const endingBlock = 10000835 + 20000;
     let currentBlock = startingBlock;
+    let eventsToSave: Object[] = [];
     while (currentBlock < endingBlock) {
         // if currentBlock > endingBlock replace
+        // need to add more information about transaction - inc. block number and timestamp
         let events = await factoryContract.queryFilter(filter, currentBlock, currentBlock + 10000);
-        let eventsToSave = events.map((event) => {
-            // save instead of push
-            return {
-                txHash: event.transactionHash,
-                //@ts-ignore
-                token0: event.args[0],
-                //@ts-ignore
-                token1: event.args[1],
-                //@ts-ignore
-                pair: event.args[2]
-            };
-        });
+        events.map((event) => {
+            eventsToSave.push(
+                {
+                    txHash: event.transactionHash,
+                    //@ts-ignore
+                    token0: event.args[0],
+                    //@ts-ignore
+                    token1: event.args[1],
+                    //@ts-ignore
+                    pair: event.args[2]
+                });});
+        
 
         // Append to file
 
-        const fileName = "out/LP_" + currentBlock + "_" + (currentBlock+10000) + ".json";
-        saveJsonFile(eventsToSave, fileName);
+        // const fileName = "out/LP_" + currentBlock + "_" + (currentBlock+10000) + ".json";
+        // saveJsonFile(eventsToSave, fileName);
         currentBlock += 10000;
     }
+
+    saveJsonFile(eventsToSave, "out/LPs.json");
     // const events = await factoryContract.queryFilter(filter, 10000835, 18037988); //until 01.09.2023
 
     // Process the events (slicing to limit to the first 10 for this example)
@@ -95,6 +99,11 @@ async function getTokenMarketCap(tokenAddress: string): Promise<any> {
     
 }
 
+// TODO: Add a function to fetch add/remove liquidity events for a given LP
+async function getLiquidityEvents(pairAddress: string): Promise<any> {
+    const provider = new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
+    
+}
 
 // TODO: Add a function to fetch the token price
 // the price should be an exact price in a given LP at a given block
@@ -144,23 +153,30 @@ async function getTokenMarketCap(tokenAddress: string): Promise<any> {
 //     });
   
 
-async function getTokenPrice(pairAddress: string): Promise<any> {
+async function getTokenPrice(): Promise<any> {
+    const pairAddress = "0xcEBc7b5fA2540e16B40a2A4364E78CEcefB7F368";
     const provider = new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
 
-    const pairAbi = ['function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external returns (uint amount0In, uint amount1In)'];
+    const pairAbi = ['function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external returns (uint amount0In, uint amount1In)',
+                    'function addLiquidity(address tokenA,address tokenB, uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB, uint liquidity)',
+                    'function removeLiquidity(address tokenA, address tokenB, uint liquidity, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB)'];
     const pairContract = new ethers.Contract(pairAddress, pairAbi, provider);
     
-    const filter = pairContract.filters.swap();
-    const startingBlock = 10000835;
-    const endingBlock = 10000835 + 20000;
-    let currentBlock = startingBlock;
-    while (currentBlock < endingBlock) {
+    console.log(pairContract.filters);
 
-        const events = await pairContract.queryFilter(filter, currentBlock, currentBlock + 10000);
-        events.map((event) => {
-            console.log(event);
-        });
-    }
+    // const filter = pairContract.filters.swap();
+    // const startingBlock = 16609100;
+    // const endingBlock = 16615486;
+    // let currentBlock = startingBlock;
+    // while (currentBlock < endingBlock) {
+
+    //     const events = await pairContract.queryFilter(filter, currentBlock, currentBlock + 10000);
+    //     events.map((event) => {
+    //         console.log(event);
+    //     });
+        
+    //     currentBlock += 10000;
+    // }
 
 }
 
@@ -212,6 +228,7 @@ async function processPairCreatedEvents() {
 // getPairCreatedEvents();
 
 
+getTokenPrice();
 
 // processPairCreatedEvents();
 
