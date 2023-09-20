@@ -1,10 +1,12 @@
-import { ethers } from 'ethers';
+import { EventLog, TopicFilter, ethers } from 'ethers';
 import saveJsonFile from './utils/saveJsonFile';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { PairCreatedEvent } from './models';
 import readJsonFile from './utils/readJsonFile';
 import appendJsonFile from './utils/appendJsonFile';
+// get bignumbers
+import { BigNumber } from 'bignumber.js';
 dotenv.config();
 
 if (!fs.existsSync('out')) fs.mkdirSync('out');
@@ -13,8 +15,6 @@ if (!fs.existsSync('out')) fs.mkdirSync('out');
 const factoryAddress = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f';
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
-
-
 
 async function getPairCreatedEvents() {
     // Connect to Ethereum node provider using JsonRpcProvider
@@ -157,12 +157,78 @@ async function getTokenPrice(): Promise<any> {
     const pairAddress = "0xcEBc7b5fA2540e16B40a2A4364E78CEcefB7F368";
     const provider = new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
 
-    const pairAbi = ['function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external returns (uint amount0In, uint amount1In)',
-                    'function addLiquidity(address tokenA,address tokenB, uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB, uint liquidity)',
-                    'function removeLiquidity(address tokenA, address tokenB, uint liquidity, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB)'];
+    const pairAbi = ['event Swap(address indexed sender,uint amount0In,uint amount1In,uint amount0Out,uint amount1Out,address indexed to)',
+                    'event Mint(address indexed sender, uint amount0, uint amount1)',
+                    'event Burn(address indexed sender, uint amount0, uint amount1, address indexed to)'];
+    const iface = new ethers.Interface(pairAbi);
     const pairContract = new ethers.Contract(pairAddress, pairAbi, provider);
     
-    console.log(pairContract.filters);
+    const filter_swap = await pairContract.filters.Swap().getTopicFilter();
+    const filter_mint = await pairContract.filters.Mint().getTopicFilter();
+    const filter_burn = await pairContract.filters.Burn().getTopicFilter();
+
+    // const filter = [filter_swap.topics.concat(filter_mint).concat(filter_burn)] as Filter;
+
+    const startingBlock = 16609100;
+
+    const filter = [filter_swap.concat(filter_mint).concat(filter_burn)] as TopicFilter;
+
+    let events = await pairContract.queryFilter(filter, startingBlock, startingBlock + 10000);
+    // console.log(swaps);
+    events.map((event) => {
+        if ("args" in event) {
+            const type = event.fragment.name;
+            let ev;
+            switch (type) {
+                case "Swap":
+                    console.log("SWAP");
+                    ev = {
+                        txHash: event.transactionHash,
+                        amount0In: Number(BigNumber(event.args.amount0In.toString()).div(1e18).toString()),
+                        amount1In: Number(BigNumber(event.args.amount1In.toString()).div(1e18).toString()),
+                        amount0Out: Number(BigNumber(event.args.amount0Out.toString()).div(1e18).toString()),
+                        amount1Out: Number(BigNumber(event.args.amount1Out.toString()).div(1e18).toString()),
+                    };
+                    console.log(ev);
+                    break;
+                case "Mint":
+                    console.log("Add liquidity");
+                    ev = {
+                        amount0: event.args.amount0,
+                        amount1: event.args.amount1,
+                    };
+                    console.log(ev);
+                    break;
+                case "Burn":
+                    console.log("Remove liquidity");
+                    ev = {
+                        amount0: event.args.amount0,
+                        amount1: event.args.amount1,
+                    };
+                    console.log(ev);
+                    break;
+                default:
+                    console.log("unknown type");
+                    console.log(event);
+
+            }
+        } else {
+            console.log("no args:");
+            console.log(event);
+        }});
+    // console.log("=====================================");
+    // let mints = await pairContract.queryFilter(filter_mint, startingBlock, startingBlock + 10000);
+    // mints.map((event) => {
+    //     console.log("MINTS:");
+    //     console.log(event);
+    // });
+    // console.log("=====================================");
+    // let burns = await pairContract.queryFilter(filter_burn, startingBlock, startingBlock + 10000);
+    // burns.map((event) => {
+    //     console.log("BURNS:");
+    //     console.log(event);
+    // });
+
 
     // const filter = pairContract.filters.swap();
     // const startingBlock = 16609100;
